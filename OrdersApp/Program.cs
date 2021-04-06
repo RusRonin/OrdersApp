@@ -33,22 +33,7 @@ namespace OrdersApp
             }
             else if (command == "stats")
             {
-                List<Order> orders = ReadOrders();
-                List<CustomerStatistics> customers = new List<CustomerStatistics>();
-                foreach (Order order in orders)
-                {
-                    CustomerStatistics customer = customers.Find(c => c.customerId == order.CustomerId);
-                    if (customer == null)
-                    {
-                        customer = new CustomerStatistics();
-                        customer.customerId = order.CustomerId;
-                        customer.ordersCount = 0;
-                        customer.totalCost = 0;
-                        customers.Add(customer);
-                    }
-                    customer.ordersCount++;
-                    customer.totalCost += order.Price;
-                }
+                List<CustomerStatistics> customers = GetStatistics();
                 foreach (CustomerStatistics customer in customers)
                 {
                     Console.WriteLine(customer.ToString());
@@ -139,6 +124,36 @@ namespace OrdersApp
                     command.ExecuteNonQuery();
                 }
             }
+        }
+
+        private static List<CustomerStatistics> GetStatistics()
+        {
+            List<CustomerStatistics> customerStatistics = new List<CustomerStatistics>();
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (SqlCommand command = new SqlCommand())
+                {
+                    command.Connection = connection;
+                    command.CommandText =
+                        @"SELECT [CustomerId], SUM(CAST([Price] AS INT)) AS Sum, COUNT([OrderId]) AS Count FROM [Order] GROUP BY [CustomerId]";
+
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var customer = new CustomerStatistics
+                            {
+                                customerId = Convert.ToInt32(reader["CustomerId"]),
+                                totalCost = Convert.ToInt32(reader["Sum"]),
+                                ordersCount = Convert.ToInt32(reader["Count"])
+                            };
+                            customerStatistics.Add(customer);
+                        }
+                    }
+                }
+            }
+            return customerStatistics;
         }
     }
 }
